@@ -3,573 +3,478 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>World PRO - Editor s AI & IndexedDB</title>
+    <title>Word Flow Pro - Moderný Textový Editor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
         
+        :root {
+            --brand-primary: #6366f1;
+            --brand-secondary: #a855f7;
+            --editor-bg: #ffffff;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            overflow-x: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
         }
 
-        .glass-morphism {
-            background: rgba(30, 41, 59, 0.7);
+        /* Glassmorphism effects */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
-        .editor-area {
-            min-height: 500px;
+        .ribbon-tab {
+            @apply px-5 py-3 cursor-pointer border-b-2 border-transparent text-gray-500 font-medium transition-all duration-300 relative;
+        }
+
+        .ribbon-tab:hover {
+            @apply text-indigo-600 bg-indigo-50/50;
+        }
+
+        .ribbon-tab.active {
+            @apply border-indigo-600 text-indigo-600 font-bold bg-white;
+        }
+
+        .editor-container {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            box-shadow: 0 10px 50px -12px rgba(0, 0, 0, 0.08);
+            margin: 40px auto;
+            padding: 30mm;
             outline: none;
+            border-radius: 4px;
+            transition: transform 0.3s ease;
         }
 
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        .editor-container:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 60px -12px rgba(0, 0, 0, 0.12);
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 10px;
+
+        .premium-locked {
+            filter: grayscale(1) blur(4px);
+            pointer-events: none;
+            opacity: 0.6;
         }
 
         .modal-overlay {
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(5px);
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
         }
 
-        .active-modal {
-            display: flex;
+        .card-gradient {
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
         }
 
-        .pro-badge {
-            background: linear-gradient(90deg, #f59e0b, #d97706);
-            color: white;
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: bold;
-            margin-left: 5px;
-            vertical-align: middle;
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
 
-        .ai-loading {
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+        .tool-btn {
+            @apply p-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all duration-200 text-gray-600;
         }
     </style>
 </head>
-<body class="custom-scrollbar">
+<body class="h-screen flex flex-col overflow-hidden">
 
-    <!-- Navigácia -->
-    <nav class="glass-morphism sticky top-0 z-40 px-6 py-4 flex justify-between items-center border-b border-slate-700">
-        <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <i class="fas fa-globe text-xl"></i>
+    <!-- Horná lišta / Ribbon -->
+    <header class="glass-panel border-b border-slate-200 shadow-sm z-10">
+        <div class="flex items-center px-6 py-3 bg-white border-b border-slate-100">
+            <div class="flex items-center space-x-2 mr-8">
+                <div class="w-10 h-10 card-gradient rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-file-lines text-xl"></i>
+                </div>
+                <span class="font-extrabold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600">
+                    Word Flow Pro
+                </span>
             </div>
-            <span class="text-2xl font-bold tracking-tight">WORLD <span id="navProBadge" class="hidden text-amber-500 text-sm ml-1">PRO</span></span>
+            
+            <div id="licenseStatus" class="ml-auto text-xs font-semibold bg-slate-100 text-slate-500 px-4 py-1.5 rounded-full border border-slate-200">
+                Verzia: Bezplatná
+            </div>
         </div>
         
-        <div class="flex items-center space-x-4">
-            <button onclick="toggleSection('editor')" class="hover:text-blue-400 transition">Editor</button>
-            <button onclick="toggleSection('pricing')" class="hover:text-amber-400 transition">Cenník</button>
-            <button onclick="openVerification()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-full text-xs font-semibold transition">
-                <i class="fas fa-id-card mr-2"></i>Overenie
+        <div class="flex bg-slate-50/50 px-6">
+            <div class="ribbon-tab active" onclick="switchTab('home')">Domov</div>
+            <div class="ribbon-tab" onclick="switchTab('insert')">Vložiť</div>
+            <div class="ribbon-tab" onclick="switchTab('layout')">Rozloženie</div>
+            <div class="ribbon-tab" onclick="switchTab('review')">Revízia</div>
+            <div class="ml-auto flex items-center">
+                <button onclick="openPremiumModal()" class="px-4 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-bold hover:bg-amber-200 transition-colors flex items-center space-x-2">
+                    <i class="fa-solid fa-crown"></i>
+                    <span>UPGRADE NA PREMIUM</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="toolbar" class="flex items-center px-6 py-2.5 space-x-1.5 bg-white border-b border-slate-100 overflow-x-auto">
+            <button onclick="execCmd('bold')" class="tool-btn" title="Tučné"><i class="fa-solid fa-bold"></i></button>
+            <button onclick="execCmd('italic')" class="tool-btn" title="Kurzíva"><i class="fa-solid fa-italic"></i></button>
+            <button onclick="execCmd('underline')" class="tool-btn" title="Podčiarknuté"><i class="fa-solid fa-underline"></i></button>
+            <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
+            <button onclick="execCmd('justifyLeft')" class="tool-btn"><i class="fa-solid fa-align-left"></i></button>
+            <button onclick="execCmd('justifyCenter')" class="tool-btn"><i class="fa-solid fa-align-center"></i></button>
+            <button onclick="execCmd('justifyRight')" class="tool-btn"><i class="fa-solid fa-align-right"></i></button>
+            <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
+            <select onchange="execCmd('fontName', this.value)" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="Plus Jakarta Sans">Jakarta Sans</option>
+                <option value="Arial">Arial</option>
+                <option value="Courier New">Courier New</option>
+                <option value="Georgia">Georgia</option>
+            </select>
+            <button onclick="saveDocument()" class="ml-auto bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all active:scale-95">
+                Uložiť zmeny
             </button>
-            <div onclick="toggleSection('profile')" class="w-10 h-10 rounded-full bg-slate-700 cursor-pointer overflow-hidden border-2 border-slate-500" id="navAvatar">
-                <img src="https://ui-avatars.com/api/?name=User&background=random" alt="Avatar">
-            </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Hlavný obsah -->
-    <main class="max-w-6xl mx-auto p-6">
-        
-        <!-- Sekcia Editor -->
-        <section id="section-editor" class="space-y-6">
-            <div class="flex flex-wrap items-center justify-between bg-slate-800 p-3 rounded-t-xl border-x border-t border-slate-700">
-                <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="execCmd('bold')" class="p-2 hover:bg-slate-700 rounded w-10"><i class="fas fa-bold"></i></button>
-                    <button onclick="execCmd('italic')" class="p-2 hover:bg-slate-700 rounded w-10"><i class="fas fa-italic"></i></button>
-                    <div class="w-px h-6 bg-slate-600 mx-1"></div>
-                    <button onclick="askGemini()" class="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 rounded-lg text-sm transition">
-                        <i class="fas fa-magic"></i>
-                        <span>AI Vylepšenie</span>
-                        <span class="pro-badge">PRO</span>
-                    </button>
-                    <button onclick="exportPDF()" class="p-2 hover:bg-slate-700 rounded text-sm">
-                        <i class="fas fa-file-pdf mr-1"></i> Export PDF <span class="pro-badge">PRO</span>
-                    </button>
-                </div>
-                <div class="text-slate-400 text-xs flex items-center">
-                    <div id="saveStatus" class="mr-3 opacity-0 transition-opacity">Uložené v DB...</div>
-                    Režim: <span id="currentPlanStatus" class="text-green-400 ml-1">Zadarmo</span>
-                </div>
-            </div>
-            <div id="editor" contenteditable="true" class="editor-area bg-slate-900 p-8 rounded-b-xl border border-slate-700 shadow-2xl focus:ring-2 ring-blue-500 transition-all custom-scrollbar">
-                Načítavam dáta z databázy...
-            </div>
-        </section>
-
-        <!-- Sekcia Cenník (Upgrade PRO) -->
-        <section id="section-pricing" class="hidden py-12 animate-fade-in">
-            <div class="text-center mb-12">
-                <h2 class="text-4xl font-bold mb-4">Upgrade <span class="text-amber-500">PRO</span></h2>
-                <p class="text-slate-400">Získajte prístup k nástrojom novej generácie.</p>
-                <div id="expirationInfo" class="mt-4 text-amber-500 font-bold hidden"></div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Free -->
-                <div class="glass-morphism p-8 rounded-3xl border-slate-700">
-                    <h3 class="text-xl font-bold mb-2">Free</h3>
-                    <div class="text-3xl font-black mb-6">0€ <span class="text-sm font-normal text-slate-500">/ navždy</span></div>
-                    <ul class="space-y-3 text-slate-400 text-sm mb-8">
-                        <li><i class="fas fa-check text-green-500 mr-2"></i> Základný editor</li>
-                        <li><i class="fas fa-check text-green-500 mr-2"></i> Lokálna IndexedDB</li>
-                        <li class="opacity-50"><i class="fas fa-times mr-2"></i> Google Gemini AI</li>
-                    </ul>
-                    <button id="btnFree" disabled class="w-full py-3 bg-slate-700 rounded-xl font-bold cursor-not-allowed">Aktuálny plán</button>
-                </div>
-                <!-- PRO -->
-                <div class="glass-morphism p-8 rounded-3xl border-amber-500 shadow-xl shadow-amber-500/10 transform scale-105">
-                    <div class="bg-amber-500 text-black text-[10px] font-bold px-2 py-1 rounded absolute top-4 right-4 uppercase">Populárne</div>
-                    <h3 class="text-xl font-bold mb-2">PRO</h3>
-                    <div class="text-3xl font-black mb-6">9.99€ <span class="text-sm font-normal text-slate-500">/ mesačne</span></div>
-                    <ul class="space-y-3 text-sm mb-8">
-                        <li><i class="fas fa-check text-amber-500 mr-2"></i> Všetko z Free</li>
-                        <li><i class="fas fa-check text-amber-500 mr-2"></i> <b>Google Gemini AI</b></li>
-                        <li><i class="fas fa-check text-amber-500 mr-2"></i> Export do PDF</li>
-                    </ul>
-                    <button id="btnPro" onclick="openPayment('PRO', 9.99)" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-bold transition">Aktivovať PRO</button>
-                </div>
-                <!-- Business -->
-                <div class="glass-morphism p-8 rounded-3xl border-slate-700">
-                    <h3 class="text-xl font-bold mb-2">Business</h3>
-                    <div class="text-3xl font-black mb-6">29.99€ <span class="text-sm font-normal text-slate-500">/ mesačne</span></div>
-                    <ul class="space-y-3 text-slate-400 text-sm mb-8">
-                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Všetko z PRO</li>
-                        <li><i class="fas fa-check text-blue-500 mr-2"></i> Tímová spolupráca</li>
-                    </ul>
-                    <button onclick="openPayment('Business', 29.99)" class="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold transition">Kontaktovať predaj</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Sekcia Profil a Nastavenia -->
-        <section id="section-profile" class="hidden space-y-8 animate-fade-in">
-            <div class="relative h-48 rounded-2xl overflow-hidden group">
-                <div id="profileBanner" class="w-full h-full bg-gradient-to-r from-blue-900 to-indigo-900"></div>
-                <label class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition">
-                    <i class="fas fa-camera mr-2"></i> Zmeniť banner
-                    <input type="file" class="hidden" onchange="updateImage(this, 'profileBanner')">
-                </label>
-            </div>
-
-            <div class="flex flex-col md:flex-row items-start md:items-end -mt-20 px-8 space-y-4 md:space-y-0 md:space-x-6">
-                <div class="relative group">
-                    <div class="w-32 h-32 rounded-full border-4 border-slate-900 overflow-hidden bg-slate-800">
-                        <img id="profilePic" src="https://ui-avatars.com/api/?name=User&size=256" class="w-full h-full object-cover">
-                    </div>
-                    <label class="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition text-xs">
-                        Zmeniť
-                        <input type="file" class="hidden" onchange="updateImage(this, 'profilePic')">
-                    </label>
-                </div>
-                <div class="pb-2">
-                    <h2 class="text-3xl font-bold flex items-center">
-                        <span id="displayName">Používateľ World</span>
-                        <span id="profileProBadge" class="hidden pro-badge ml-3">PRO</span>
-                    </h2>
-                    <p class="text-slate-400">ID: #482910</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-                <div class="glass-morphism p-6 rounded-2xl">
-                    <h3 class="text-xl font-bold mb-4">AI Konfigurácia</h3>
-                    <div class="space-y-4">
-                        <div class="space-y-2">
-                            <label class="text-xs text-slate-400 uppercase font-bold tracking-wider">Google Gemini API Key</label>
-                            <input type="password" id="geminiKey" placeholder="Zadajte kľúč..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 focus:ring-2 ring-blue-500 outline-none transition">
-                            <button onclick="saveApiKey()" class="mt-2 bg-blue-600 hover:bg-blue-500 w-full py-2 rounded-lg text-sm font-bold transition">Uložiť do IndexedDB</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="glass-morphism p-6 rounded-2xl flex flex-col justify-between">
-                    <div>
-                        <h3 class="text-xl font-bold mb-4">Správa Predplatného</h3>
-                        <div id="subscriptionStatus" class="p-4 bg-slate-800 rounded-xl mb-4 text-sm">
-                            Načítavam stav...
-                        </div>
-                        <button onclick="simulateExpire()" class="text-[10px] text-red-500 hover:underline">Simulovať vypršanie predplatného (Debug)</button>
-                    </div>
-                    
-                    <div class="mt-8 pt-6 border-t border-slate-700 text-center">
-                        <div class="flex items-center justify-center space-x-3 mb-2 opacity-80">
-                            <div class="w-8 h-8 bg-white text-black rounded flex items-center justify-center font-black">G6</div>
-                            <span class="font-bold tracking-widest text-sm uppercase">GAMEPLA631</span>
-                        </div>
-                        <p class="text-slate-500 text-[10px] uppercase tracking-widest">Vyvinula spoločnosť GAMEPLA631</p>
-                    </div>
-                </div>
-            </div>
-        </section>
+    <!-- Hlavná plocha -->
+    <main class="flex-1 overflow-y-auto p-4 md:p-12 custom-scrollbar">
+        <div id="editor" class="editor-container" contenteditable="true" spellcheck="false">
+            <h1 style="font-size: 24px; font-weight: 800; margin-bottom: 20px;">Váš moderný dokument</h1>
+            <p>Začnite písať váš profesionálny text v novom prostredí Word Flow Pro...</p>
+        </div>
     </main>
 
-    <!-- Modálne okno Platobná Brána -->
-    <div id="paymentModal" class="modal-overlay">
-        <div class="bg-white text-slate-900 p-8 rounded-3xl max-w-md w-full m-4 shadow-2xl relative">
-            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 to-amber-600"></div>
-            <div class="flex justify-between items-center mb-6">
-                <span class="font-bold uppercase tracking-widest text-xs text-slate-500"><i class="fas fa-lock mr-2"></i>Platba</span>
-                <button onclick="closePayment()" class="text-slate-400 hover:text-slate-900"><i class="fas fa-times"></i></button>
-            </div>
-            <h2 class="text-2xl font-bold mb-1 italic">World PRO Upgrade</h2>
-            <p class="text-slate-500 mb-6 text-sm">Platnosť: 30 dní (9.99€)</p>
-            <form onsubmit="processPayment(event)" class="space-y-4">
-                <input type="text" required placeholder="Meno na karte" class="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-amber-500">
-                <input type="text" required placeholder="Číslo karty" class="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-amber-500">
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="text" required placeholder="MM/YY" class="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-amber-500">
-                    <input type="text" required placeholder="CVC" class="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-amber-500">
+    <!-- MODAL: Premium Balíčky -->
+    <div id="premiumModal" class="hidden fixed inset-0 modal-overlay z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="p-10">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-black text-slate-900 mb-3">Vyberte si svoj balíček Pro</h2>
+                    <p class="text-slate-500">Odomknite plný potenciál vašej tvorby s našimi flexibilnými plánmi.</p>
                 </div>
-                <button type="submit" id="payBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition mt-4">Zaplatiť 9.99€</button>
-            </form>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Balíček 1 -->
+                    <div class="bg-white border border-slate-100 rounded-3xl p-8 hover:border-indigo-200 hover:shadow-xl transition-all flex flex-col group">
+                        <div class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-100 transition-colors">
+                            <i class="fa-solid fa-graduation-cap text-slate-600 group-hover:text-indigo-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Student Basic</h3>
+                        <p class="text-4xl font-black text-slate-900 mb-6">4.99€<span class="text-sm font-medium text-slate-400">/mesiac</span></p>
+                        <ul class="text-sm space-y-4 mb-8 text-slate-600 flex-1">
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> Základné formátovanie</li>
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> Export do PDF</li>
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> 1 zariadenie</li>
+                        </ul>
+                        <button onclick="checkout(1, 'Student Basic', 4.99, 30)" class="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold hover:bg-black transition-colors">Vybrať plán</button>
+                    </div>
+
+                    <!-- Balíček 2 (Highlight) -->
+                    <div class="card-gradient rounded-3xl p-1 bg-white shadow-2xl relative flex flex-col scale-105">
+                        <div class="bg-white h-full w-full rounded-[22px] p-8 flex flex-col">
+                            <span class="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-5 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-lg">Najobľúbenejšie</span>
+                            <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6">
+                                <i class="fa-solid fa-briefcase text-indigo-600"></i>
+                            </div>
+                            <h3 class="text-xl font-bold mb-2">Professional</h3>
+                            <p class="text-4xl font-black text-indigo-600 mb-6">12.99€<span class="text-sm font-medium text-slate-400">/mesiac</span></p>
+                            <ul class="text-sm space-y-4 mb-8 text-slate-600 flex-1">
+                                <li class="flex items-center font-semibold"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> Všetko z Basic</li>
+                                <li class="flex items-center"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> AI asistent (100 dotazov)</li>
+                                <li class="flex items-center"><i class="fa-solid fa-circle-check text-indigo-500 mr-3"></i> Cloudové úložisko 10GB</li>
+                            </ul>
+                            <button onclick="checkout(2, 'Professional', 12.99, 30)" class="w-full bg-indigo-600 text-white py-3.5 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">Aktivovať Professional</button>
+                        </div>
+                    </div>
+
+                    <!-- Balíček 3 -->
+                    <div class="bg-white border border-slate-100 rounded-3xl p-8 hover:border-purple-200 hover:shadow-xl transition-all flex flex-col group">
+                        <div class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-purple-100 transition-colors">
+                            <i class="fa-solid fa-building text-slate-600 group-hover:text-purple-600"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">Business Elite</h3>
+                        <p class="text-4xl font-black text-slate-900 mb-6">29.99€<span class="text-sm font-medium text-slate-400">/mesiac</span></p>
+                        <ul class="text-sm space-y-4 mb-8 text-slate-600 flex-1">
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-purple-500 mr-3"></i> Tímová spolupráca</li>
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-purple-500 mr-3"></i> Neobmedzené AI</li>
+                            <li class="flex items-center"><i class="fa-solid fa-circle-check text-purple-500 mr-3"></i> Vlastné písma</li>
+                        </ul>
+                        <button onclick="checkout(3, 'Business Elite', 29.99, 30)" class="w-full bg-slate-900 text-white py-3.5 rounded-2xl font-bold hover:bg-black transition-colors">Vybrať plán</button>
+                    </div>
+
+                    <!-- Balíček 4 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-3xl p-8 flex flex-col">
+                        <h3 class="text-xl font-bold mb-2 text-slate-900">Yearly Pass</h3>
+                        <p class="text-3xl font-black text-emerald-600 mb-6">99.99€<span class="text-sm font-medium text-slate-400">/rok</span></p>
+                        <button onclick="checkout(4, 'Yearly Pass', 99.99, 365)" class="w-full border-2 border-slate-900 py-3 rounded-2xl font-bold hover:bg-slate-900 hover:text-white transition-all">Ušetriť 35%</button>
+                    </div>
+
+                    <!-- Balíček 5 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-3xl p-8 flex flex-col">
+                        <h3 class="text-xl font-bold mb-2 text-slate-900">Creator Mode</h3>
+                        <p class="text-3xl font-black text-indigo-600 mb-6">19.99€<span class="text-sm font-medium text-slate-400">/mesiac</span></p>
+                        <button onclick="checkout(5, 'Creator Mode', 19.99, 30)" class="w-full border-2 border-slate-900 py-3 rounded-2xl font-bold hover:bg-slate-900 hover:text-white transition-all">Vybrať Creator</button>
+                    </div>
+
+                    <!-- Balíček 6 -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-3xl p-8 flex flex-col">
+                        <h3 class="text-xl font-bold mb-2 text-slate-900">Enterprise</h3>
+                        <p class="text-3xl font-black text-red-600 mb-6">149.99€<span class="text-sm font-medium text-slate-400">/rok</span></p>
+                        <button onclick="checkout(6, 'Enterprise', 149.99, 365)" class="w-full border-2 border-slate-900 py-3 rounded-2xl font-bold hover:bg-slate-900 hover:text-white transition-all">Kontaktovať sales</button>
+                    </div>
+                </div>
+                
+                <div class="mt-10 text-center">
+                    <button onclick="closePremiumModal()" class="text-slate-400 hover:text-slate-600 font-medium underline">Neskôr, ostať pri bezplatnej verzii</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Modálne okno Overenia -->
-    <div id="verifyModal" class="modal-overlay">
-        <div class="glass-morphism p-8 rounded-3xl max-w-lg w-full m-4">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">Overenie Identity</h2>
-                <button onclick="closeVerification()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
-            </div>
-            <label class="block p-4 bg-slate-800 border-2 border-dashed border-slate-600 rounded-xl hover:border-blue-500 cursor-pointer text-center">
-                <i class="fas fa-camera text-3xl mb-2 text-indigo-400"></i>
-                <div class="font-bold">Nahrať Kvalitnú Selfie (40000px)</div>
-                <input type="file" class="hidden" onchange="simulateUpload(this)">
-            </label>
-            <div id="uploadStatus" class="mt-4 hidden">
-                <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
-                    <div id="progressBar" class="bg-blue-500 h-full w-0 transition-all duration-500"></div>
+    <!-- MODAL: Platobná brána -->
+    <div id="checkoutModal" class="hidden fixed inset-0 modal-overlay z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-[40px] max-w-md w-full shadow-2xl overflow-hidden border border-white/50">
+            <div class="card-gradient p-10 text-white text-center relative overflow-hidden">
+                <div class="absolute top-0 right-0 opacity-10 rotate-12 scale-150">
+                    <i class="fa-solid fa-shield-halved text-[200px]"></i>
                 </div>
+                <h3 class="text-2xl font-black mb-2">Bezpečná platba</h3>
+                <p id="checkoutDesc" class="text-indigo-100 text-sm">Prémiový balíček Professional</p>
+            </div>
+            <div class="p-10 bg-white">
+                <form id="paymentForm" onsubmit="processPayment(event)" class="space-y-5">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Meno na karte</label>
+                        <input type="text" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:bg-white outline-none transition-all" placeholder="JOHN DOE">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Číslo karty</label>
+                        <div class="relative">
+                            <input type="text" maxlength="19" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:bg-white outline-none transition-all pl-12" placeholder="0000 0000 0000 0000">
+                            <i class="fa-solid fa-credit-card absolute left-4 top-4 text-slate-300"></i>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Expirácia</label>
+                            <input type="text" placeholder="MM/YY" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:bg-white outline-none transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">CVC</label>
+                            <input type="password" placeholder="***" maxlength="3" required class="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 text-sm focus:ring-4 focus:ring-indigo-500/10 focus:bg-white outline-none transition-all">
+                        </div>
+                    </div>
+                    <button id="payBtn" type="submit" class="w-full bg-indigo-600 text-white py-5 rounded-[22px] font-black hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all active:scale-95 mt-4">
+                        Potvrdiť platbu <span id="payAmount">0.00</span>€
+                    </button>
+                    <div class="flex items-center justify-center space-x-2 text-[10px] text-slate-400 uppercase font-bold tracking-tighter mt-6">
+                        <i class="fa-solid fa-lock text-emerald-500"></i>
+                        <span>Šifrované bankové spojenie</span>
+                    </div>
+                </form>
             </div>
         </div>
+    </div>
+
+    <!-- Systémové Notifikácie -->
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl opacity-0 pointer-events-none transition-all duration-500 z-[100] flex items-center space-x-3">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span class="font-bold text-sm tracking-wide">Úspešne uložené!</span>
     </div>
 
     <script>
-        // --- INDEXED DB ENGINE ---
-        const DB_NAME = 'WorldDatabase';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'appData';
+        // --- KONFIGURÁCIA A STAV ---
+        let currentLicense = null;
+        let selectedPackage = null;
+        const APP_DB_NAME = "WordFlowProDB_Modern";
+        const APP_DB_VERSION = 1;
         let db;
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onerror = (event) => reject('Chyba DB: ' + event.target.errorCode);
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        db.createObjectStore(STORE_NAME);
-                    }
-                };
-                request.onsuccess = (event) => {
-                    db = event.target.result;
-                    resolve(db);
-                };
-            });
-        }
-
-        async function saveToDB(key, data) {
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
-            store.put(data, key);
-        }
-
-        async function getFromDB(key) {
-            return new Promise((resolve) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get(key);
-                request.onsuccess = () => resolve(request.result);
-            });
-        }
-
-        // --- STAV APLIKÁCIE ---
-        let appState = {
-            isPro: false,
-            proExpiration: null, // Timestamp vypršania
-            apiKey: '',
-            isVerified: false,
-            content: '',
-            profileName: 'Používateľ World'
-        };
-
-        window.onload = async () => {
-            try {
-                await initDB();
-                const savedState = await getFromDB('state');
-                if (savedState) {
-                    appState = savedState;
-                }
-                
-                checkProExpiration();
-                applyState();
-                
-                // Auto-save do IndexedDB
-                document.getElementById('editor').addEventListener('input', () => {
-                    appState.content = document.getElementById('editor').innerHTML;
-                    saveToDB('state', appState);
-                    showAutoSave();
-                });
-
-                // Kontrola expirácie každých 30 sekúnd
-                setInterval(checkProExpiration, 30000);
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('editor').innerText = "Chyba pri načítaní databázy.";
-            }
-        };
-
-        function checkProExpiration() {
-            if (appState.isPro && appState.proExpiration) {
-                const now = Date.now();
-                if (now > appState.proExpiration) {
-                    appState.isPro = false;
-                    appState.proExpiration = null;
-                    saveToDB('state', appState);
-                    applyState();
-                    showNotification("Vaše PRO predplatné vypršalo. Prosím, obnovte si ho.", "error");
-                }
-            }
-        }
-
-        function applyState() {
-            document.getElementById('editor').innerHTML = appState.content || 'Začnite písať svoj text tu...';
-            document.getElementById('geminiKey').value = appState.apiKey || '';
+        // --- DATABASE (IndexedDB) LOGIKA ---
+        const initDB = () => {
+            const request = indexedDB.open(APP_DB_NAME, APP_DB_VERSION);
             
-            const proBadgeNav = document.getElementById('navProBadge');
-            const proBadgeProfile = document.getElementById('profileProBadge');
-            const planStatus = document.getElementById('currentPlanStatus');
-            const subStatus = document.getElementById('subscriptionStatus');
-            const expInfo = document.getElementById('expirationInfo');
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains('settings')) {
+                    db.createObjectStore('settings');
+                }
+                if (!db.objectStoreNames.contains('documents')) {
+                    db.createObjectStore('documents');
+                }
+            };
 
-            if (appState.isPro) {
-                proBadgeNav.classList.remove('hidden');
-                proBadgeProfile.classList.remove('hidden');
-                planStatus.innerText = 'PRO';
-                planStatus.classList.replace('text-green-400', 'text-amber-500');
-                
-                const timeLeft = appState.proExpiration - Date.now();
-                const daysLeft = Math.ceil(timeLeft / (1000 * 60 * 60 * 24));
-                subStatus.innerHTML = `<span class="text-amber-500 font-bold">Aktívne PRO</span><br>Zostáva dní: ${daysLeft}`;
-                expInfo.innerText = `Premium aktívne ešte ${daysLeft} dní`;
-                expInfo.classList.remove('hidden');
-                
-                document.getElementById('btnPro').innerText = "Predĺžiť PRO";
-                document.getElementById('btnFree').disabled = false;
-                document.getElementById('btnFree').classList.replace('cursor-not-allowed', 'hover:bg-slate-600');
-                document.getElementById('btnFree').innerText = "Prejsť na Free";
+            request.onsuccess = (event) => {
+                db = event.target.result;
+                checkLicense();
+                loadDocument();
+            };
+        };
+
+        const saveToDB = (store, key, value) => {
+            const tx = db.transaction(store, 'readwrite');
+            tx.objectStore(store).put(value, key);
+        };
+
+        const getFromDB = (store, key) => {
+            return new Promise((resolve) => {
+                const tx = db.transaction(store, 'readonly');
+                const req = tx.objectStore(store).get(key);
+                req.onsuccess = () => resolve(req.result);
+            });
+        };
+
+        // --- LICENČNÝ SYSTÉM ---
+        const checkLicense = async () => {
+            const license = await getFromDB('settings', 'active_license');
+            const editor = document.getElementById('editor');
+            const statusEl = document.getElementById('licenseStatus');
+
+            if (license) {
+                const now = new Date().getTime();
+                if (now < license.expiryDate) {
+                    currentLicense = license;
+                    const dateStr = new Date(license.expiryDate).toLocaleDateString();
+                    statusEl.innerHTML = `<i class="fa-solid fa-crown text-amber-500 mr-2"></i> Premium: ${license.name}`;
+                    statusEl.className = "ml-auto text-xs font-bold bg-amber-50 text-amber-700 px-4 py-1.5 rounded-full border border-amber-200 flex items-center";
+                    editor.classList.remove('premium-locked');
+                } else {
+                    currentLicense = null;
+                    statusEl.innerHTML = `<i class="fa-solid fa-circle-exclamation text-red-500 mr-2"></i> Predplatné vypršalo`;
+                    statusEl.className = "ml-auto text-xs font-bold bg-red-50 text-red-700 px-4 py-1.5 rounded-full border border-red-200 flex items-center";
+                    editor.classList.add('premium-locked');
+                    showToast("Vaša licencia expirovala. Prosím, obnovte platbu.");
+                }
             } else {
-                proBadgeNav.classList.add('hidden');
-                proBadgeProfile.classList.add('hidden');
-                planStatus.innerText = 'Zadarmo';
-                planStatus.classList.replace('text-amber-500', 'text-green-400');
-                subStatus.innerHTML = `<span class="text-slate-400 italic">Bezplatný plán</span>`;
-                expInfo.classList.add('hidden');
-                
-                document.getElementById('btnPro').innerText = "Aktivovať PRO";
-                document.getElementById('btnFree').disabled = true;
-                document.getElementById('btnFree').innerText = "Aktuálny plán";
+                statusEl.innerHTML = "Bezplatná verzia";
             }
-        }
+        };
 
-        // --- PLATBY A PREDPLATNÉ ---
-        function openPayment(plan, price) {
-            document.getElementById('paymentModal').classList.add('active-modal');
-        }
+        // --- UI MANIPULÁCIA ---
+        const openPremiumModal = () => document.getElementById('premiumModal').classList.remove('hidden');
+        const closePremiumModal = () => document.getElementById('premiumModal').classList.add('hidden');
+        
+        const checkout = (id, name, price, days) => {
+            selectedPackage = { id, name, price, days };
+            document.getElementById('checkoutDesc').innerText = `Balíček ${name} na ${days} dní`;
+            document.getElementById('payAmount').innerText = price;
+            document.getElementById('checkoutModal').classList.remove('hidden');
+        };
 
-        function closePayment() {
-            document.getElementById('paymentModal').classList.remove('active-modal');
-        }
-
-        function processPayment(e) {
+        const processPayment = (e) => {
             e.preventDefault();
             const btn = document.getElementById('payBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Spracovávam...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Šifrovanie...';
 
             setTimeout(() => {
-                appState.isPro = true;
-                // Nastavenie na 30 dní od teraz
-                const thirtyDays = 30 * 24 * 60 * 60 * 1000;
-                appState.proExpiration = Date.now() + thirtyDays;
-                
-                saveToDB('state', appState);
-                applyState();
-                closePayment();
-                btn.disabled = false;
-                btn.innerText = "Zaplatiť 9.99€";
-                showNotification("Platba úspešná! Premium aktivované na 30 dní.", "success");
-            }, 2000);
-        }
+                const expiry = new Date();
+                expiry.setDate(expiry.getDate() + selectedPackage.days);
 
-        function simulateExpire() {
-            if (!appState.isPro) return;
-            appState.proExpiration = Date.now() - 1000; // Vypršalo pred sekundou
-            checkProExpiration();
-        }
-
-        // --- OSTATNÉ FUNKCIE ---
-        async function askGemini() {
-            if (!appState.isPro) {
-                showNotification("AI vyžaduje PRO upgrade!", "error");
-                toggleSection('pricing');
-                return;
-            }
-            if (!appState.apiKey) {
-                showNotification("Zadajte API kľúč v profile!", "error");
-                toggleSection('profile');
-                return;
-            }
-
-            const editor = document.getElementById('editor');
-            const text = editor.innerText.trim();
-            if (!text || text === 'Načítavam dáta z databázy...') {
-                showNotification("Najprv niečo napíšte!", "info");
-                return;
-            }
-
-            showNotification("AI pracuje...", "info");
-            editor.classList.add('ai-loading');
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${appState.apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        contents: [{ 
-                            parts: [{ text: "Oprav gramatiku a vylepši štýl tohto textu v slovenčine, zachovaj HTML formátovanie ak je prítomné: " + editor.innerHTML }] 
-                        }] 
-                    })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error('Gemini API Error:', errorData);
-                    throw new Error(errorData.error?.message || 'Chyba API');
-                }
-
-                const data = await response.json();
-                const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                
-                if (resultText) {
-                    editor.innerHTML = resultText;
-                    appState.content = resultText;
-                    saveToDB('state', appState);
-                    showNotification("Text bol vylepšený!", "success");
-                } else {
-                    throw new Error('Prázdna odpoveď od AI');
-                }
-            } catch (err) {
-                console.error('Detail chyby:', err);
-                showNotification(`Chyba AI spojenia: ${err.message}`, "error");
-            } finally {
-                editor.classList.remove('ai-loading');
-            }
-        }
-
-        function saveApiKey() {
-            appState.apiKey = document.getElementById('geminiKey').value;
-            saveToDB('state', appState);
-            showNotification("API kľúč uložený v IndexedDB.", "success");
-        }
-
-        function execCmd(command, value = null) {
-            document.execCommand(command, false, value);
-        }
-
-        function toggleSection(section) {
-            ['editor', 'profile', 'pricing'].forEach(s => document.getElementById('section-' + s).classList.add('hidden'));
-            document.getElementById('section-' + section).classList.remove('hidden');
-        }
-
-        function openVerification() { document.getElementById('verifyModal').classList.add('active-modal'); }
-        function closeVerification() { document.getElementById('verifyModal').classList.remove('active-modal'); }
-
-        function simulateUpload(input) {
-            if (input.files && input.files[0]) {
-                const status = document.getElementById('uploadStatus');
-                const bar = document.getElementById('progressBar');
-                status.classList.remove('hidden');
-                let w = 0;
-                const i = setInterval(() => {
-                    w += 10; bar.style.width = w + '%';
-                    if (w >= 100) {
-                        clearInterval(i);
-                        appState.isVerified = true;
-                        saveToDB('state', appState);
-                        applyState();
-                        showNotification("ID overené.");
-                        setTimeout(closeVerification, 500);
-                    }
-                }, 150);
-            }
-        }
-
-        function updateImage(input, targetId) {
-            if (input.files && input.files[0]) {
-                const r = new FileReader();
-                r.onload = (e) => {
-                    const t = document.getElementById(targetId);
-                    if (t.tagName === 'IMG') t.src = e.target.result;
-                    else t.style.backgroundImage = `url(${e.target.result})`;
-                    saveToDB('state', appState);
+                const licenseData = {
+                    ...selectedPackage,
+                    activeSince: new Date().getTime(),
+                    expiryDate: expiry.getTime()
                 };
-                r.readAsDataURL(input.files[0]);
-            }
-        }
 
-        function showNotification(msg, type = "success") {
-            const toast = document.createElement('div');
-            const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600' };
-            toast.className = `fixed bottom-4 right-4 ${colors[type] || 'bg-slate-700'} text-white px-6 py-3 rounded-lg shadow-2xl z-[200] transform transition-all duration-300 translate-y-20`;
-            toast.innerText = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.classList.remove('translate-y-20'), 50);
-            setTimeout(() => { toast.classList.add('translate-y-20'); setTimeout(() => toast.remove(), 300); }, 3500);
-        }
+                saveToDB('settings', 'active_license', licenseData);
+                
+                btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Platba dokončená';
+                btn.className = "w-full bg-emerald-500 text-white py-5 rounded-[22px] font-black";
 
-        function showAutoSave() {
-            const status = document.getElementById('saveStatus');
-            status.style.opacity = '1';
-            setTimeout(() => status.style.opacity = '0', 1000);
-        }
+                setTimeout(() => {
+                    document.getElementById('checkoutModal').classList.add('hidden');
+                    closePremiumModal();
+                    checkLicense();
+                    showToast("Premium funkcie sú aktívne!");
+                    btn.disabled = false;
+                    btn.innerHTML = `Potvrdiť platbu ${selectedPackage.price}€`;
+                    btn.className = "w-full bg-indigo-600 text-white py-5 rounded-[22px] font-black hover:bg-indigo-700";
+                }, 1500);
+            }, 2500);
+        };
 
-        function exportPDF() {
-            if (!appState.isPro) {
-                showNotification("Export vyžaduje PRO!", "error");
+        const showToast = (msg) => {
+            const t = document.getElementById('toast');
+            t.querySelector('span').innerText = msg;
+            t.classList.remove('opacity-0', 'pointer-events-none');
+            t.classList.add('opacity-100', 'translate-y-[-10px]');
+            setTimeout(() => {
+                t.classList.add('opacity-0', 'pointer-events-none');
+                t.classList.remove('opacity-100', 'translate-y-[-10px]');
+            }, 4000);
+        };
+
+        // --- EDITOR FUNKCIE ---
+        const execCmd = (cmd, val = null) => {
+            if (!currentLicense && (cmd === 'fontName')) {
+                showToast("Prémiové fonty vyžadujú licenciu!");
+                openPremiumModal();
                 return;
             }
-            window.print();
-        }
+            document.execCommand(cmd, false, val);
+        };
+
+        const saveDocument = () => {
+            const content = document.getElementById('editor').innerHTML;
+            saveToDB('documents', 'current_doc', content);
+            showToast("Váš dokument bol bezpečne uložený.");
+        };
+
+        const loadDocument = async () => {
+            const content = await getFromDB('documents', 'current_doc');
+            if (content) document.getElementById('editor').innerHTML = content;
+        };
+
+        const switchTab = (tab) => {
+            document.querySelectorAll('.ribbon-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const toolbar = document.getElementById('toolbar');
+            if (tab === 'insert') {
+                toolbar.innerHTML = `
+                    <button onclick="execCmd('insertUnorderedList')" class="tool-btn"><i class="fa-solid fa-list-ul"></i></button>
+                    <button onclick="execCmd('insertOrderedList')" class="tool-btn"><i class="fa-solid fa-list-ol"></i></button>
+                    <button onclick="showToast('AI generovanie obrázkov je v príprave')" class="tool-btn flex items-center space-x-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-500"></i>
+                        <span class="text-xs font-bold">AI IMAGE</span>
+                    </button>
+                    <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
+                    <button onclick="showToast('Tabuľky vyžadujú Business Elite')" class="tool-btn"><i class="fa-solid fa-table"></i></button>
+                    <button onclick="switchTab('home')" class="ml-auto text-xs font-bold text-slate-400 hover:text-indigo-600 transition-colors">SPÄŤ NA DOMOV</button>
+                `;
+            } else if (tab === 'home') {
+                // Pre demo účely len jednoduchý reset bez refreshu
+                toolbar.innerHTML = `
+                    <button onclick="execCmd('bold')" class="tool-btn" title="Tučné"><i class="fa-solid fa-bold"></i></button>
+                    <button onclick="execCmd('italic')" class="tool-btn" title="Kurzíva"><i class="fa-solid fa-italic"></i></button>
+                    <button onclick="execCmd('underline')" class="tool-btn" title="Podčiarknuté"><i class="fa-solid fa-underline"></i></button>
+                    <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
+                    <button onclick="execCmd('justifyLeft')" class="tool-btn"><i class="fa-solid fa-align-left"></i></button>
+                    <button onclick="execCmd('justifyCenter')" class="tool-btn"><i class="fa-solid fa-align-center"></i></button>
+                    <button onclick="execCmd('justifyRight')" class="tool-btn"><i class="fa-solid fa-align-right"></i></button>
+                    <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
+                    <select onchange="execCmd('fontName', this.value)" class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        <option value="Plus Jakarta Sans">Jakarta Sans</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Georgia">Georgia</option>
+                    </select>
+                    <button onclick="saveDocument()" class="ml-auto bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-md shadow-indigo-100 transition-all active:scale-95">Uložiť zmeny</button>
+                `;
+            }
+        };
+
+        window.onload = initDB;
     </script>
 </body>
 </html>
